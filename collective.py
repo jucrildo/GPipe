@@ -67,6 +67,8 @@ def broadcast(tensor: torch.tensor, world_size: int = 1) -> List[torch.tensor]:
     """
     if world_size == 1:
         return tensor
+    
+    rank = dist.get_rank()
 
     tensor_list = []
     for _ in range(world_size):
@@ -75,6 +77,7 @@ def broadcast(tensor: torch.tensor, world_size: int = 1) -> List[torch.tensor]:
     return tensor_list
     
 # remake it now that I understand how ranks and process groups work
+# When I call reduce, should reduce into the first process of the process group?
 def reduce(
     tensor_list: List[torch.tensor],
     target_rank: int,
@@ -93,9 +96,10 @@ def reduce(
         raise TypeError("Must be a list of tensors")
 
     if not _rank_in_group(target_rank, process_group):
-        raise Exception("target_rank is not in process group")
+        raise Exception("target_rank is not in process_group")
 
     tensor = [t.op for t in tensor_list]
+    process_group[target_rank] = tensor
 
     return tensor
 
