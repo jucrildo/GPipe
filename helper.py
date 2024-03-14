@@ -19,8 +19,17 @@ def _squeeze_list(tensor_list: List[torch.tensor]) -> List[torch.tensor]:
     list = []
     #if isinstance(tensor_list, List[torch.tensor]):
     for t in tensor_list:
-        list.append(torch.squeeze(t, dim=0)) 
+        list.append(torch.squeeze(t)) 
     return list
+
+def _rank_in_group(rank: int, process_group: List[int]) -> bool:
+    for proc in process_group:
+        if rank == proc:
+            return True
+        else:
+            return False
+
+
 
 """
 dim = 0
