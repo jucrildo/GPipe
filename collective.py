@@ -1,4 +1,4 @@
-import os
+# import os
 import torch
 import torch.distributed as dist
 from torch.distributed import ReduceOp
@@ -6,26 +6,6 @@ import torch.multiprocessing as mp
 
 from typing import Iterable, List, Optional, Tuple, Union
 from helper import _squeeze_list, _rank_in_group
-
-# type ProcessType = dict[int | str, set[str]] # like typedef in C
-
-# 1st: initialize process group
-def setup_process_group(backend:str, rank: int, world_size: int) -> None:
-    """
-    Args:
-        rank: identifier of each process
-        world_size: total number of processes
-    """
-    os.environ["MASTER_ADDR"] = "localhost" # IP address of the machine running rank0
-    os.environ["MASTER_PORT"] = "23500"
-
-    backend = "nccl" if torch.cuda.is_available() else "gloo"
-    # initializes the default distributed process group
-    dist.init_process_group(backend=backend, rank=rank, world_size=world_size)
-
-# after finishes distributed training
-def exit_process_group():
-    dist.destroy_process_group()
 
 # Collective communication "operations"
 def scatter(
@@ -43,9 +23,9 @@ def scatter(
         world_size: total number of processes
     """
     # Pipegoose scatter returns only 1 tensor. The one that is scattered to local_rank. "tensor_list[rank]"  
-    rank = dist.get_rank() # process ID
-    local_rank = torch.cuda.current_device() # GPU id
-    world_size = dist.get_world_size()
+    #rank = dist.get_rank() # process ID
+    #local_rank = torch.cuda.current_device() # GPU id
+    #world_size = dist.get_world_size()
     if dim_split >= len(tensor.shape) or dim_split < 0:
         raise ValueError("Unavailable dimmension")
     
@@ -80,8 +60,8 @@ def broadcast(tensor: torch.tensor, world_size: int = 1) -> List[torch.tensor]:
 # When I call reduce, should reduce into the first process of the process group?
 def reduce(
     tensor_list: List[torch.tensor],
-    target_rank: int,
-    process_group: List[int],
+    #target_rank: int,
+    #process_group: List[int],
     op: ReduceOp = ReduceOp.SUM,
 ) -> torch.tensor:
     """
@@ -92,20 +72,21 @@ def reduce(
         process_group: process group
         op: operation used to reduce the tensors
     """
-    if not isinstance(tensor_list):
-        raise TypeError("Must be a list of tensors")
+    #if not isinstance(tensor_list):
+    #    raise TypeError("Must be a list of tensors")
 
-    if not _rank_in_group(target_rank, process_group):
-        raise Exception("target_rank is not in process_group")
+    #if not _rank_in_group(target_rank, process_group):
+    #    raise Exception("target_rank is not in process_group")
 
-    tensor = [t.op for t in tensor_list]
-    process_group[target_rank] = tensor
+    tensor = sum([t for t in tensor_list]) # not right
+    print(tensor.shape)
+    #process_group[target_rank] = tensor
 
     return tensor
 
 
 if __name__ == "__main__":
-    world_size = torch.cuda.device_count() # how many GPUs there's on the machine
+    world_size = 4 # how many GPUs there's on the machine
     # takes a function and spawns that across all of our processes in the process group
     mp.spawn(args=(world_size), nprocs=world_size)
     pass
