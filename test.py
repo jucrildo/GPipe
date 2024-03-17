@@ -1,4 +1,5 @@
 import torch
+import torch.distributed as dist
 from collective import scatter, broadcast, reduce, setup_process_group
 
 t1 = torch.arange(0, 20)
@@ -22,4 +23,6 @@ print("Reduce:\n", tlist)
 t4 = reduce(tlist)
 print(t4)
 
-setup_process_group("gloo", rank=)
+def fn(rank=0, world_size=1):
+    dist.init_process_group(backend="gloo", rank=rank, world_size=world_size)
+    group = dist.new_group
