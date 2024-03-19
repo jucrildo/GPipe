@@ -20,28 +20,34 @@ def setup(rank, world_size):
     tlist, trank = scatter(t, 0, world_size=world_size)
     print(f"Worker: {rank} output: {trank}")
 """
-def run(rank, size, tensor):
-    if rank == 0:
-        tensor = tensor + 1
-        dist.send(tensor=tensor, dst=1)
-    else:
-        dist.recv(tensor=tensor, src=0)
-    print(f"Rank: {rank} has data {tensor[0]}")
+def run(rank, world_size):
+    tensor = torch.ones(1)
+    print(f"tensor before: {tensor}")
+    group = dist.new_group([0, 1]) # list of ranks
+    dist.all_reduce(tensor=tensor, op=dist.ReduceOp.SUM, group=group)
+    print(f"Rank: {rank} has data {tensor}")
 
-def scatter(tensor, rank, world_size, dim):
-    assert tensor[dim] % world_size == 0
-    t = torch.chunk(tensor, world_size, dim=dim)
-    return t[rank]
+def scatter(world_size, dim):
+    rank = dist.get_rank()
+    #torch.cuda.set_device(rank)
+    output = torch.zeros(1)
+    print(f"before: {rank}: {output}\n")
+    if rank == 0:
+        inputs = torch.tensor([10.0, 20.0, 30.0, 40.0])
+        inputs = output.split(inputs, dim=dim, split_size_or_sections=1)
+        dist.scatter(output, scatter_list=list(inputs), src=rank)
+    else:
+        dist.scatter(output, src=rank)
+    print(f"after {rank}: {output}\n")
 
 def init_proc(rank, world_size, func, backend="gloo"):
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = "29500"
     dist.init_process_group(backend=backend, rank=rank, world_size=world_size)
-    tensor = torch.ones(4, 4)
-    func(rank, world_size, tensor)
+    func(world_size, dim=0)#, tensor)
 
 if __name__ == "__main__":
-    world_sz = 4 # 2
+    world_sz = 4
     processes = []
     mp.set_start_method("spawn")
     for rank in range(world_sz):

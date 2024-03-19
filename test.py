@@ -1,5 +1,6 @@
 import torch
 import torch.distributed as dist
+import torch.multiprocessing as mp
 from collective import scatter, broadcast, reduce, setup_process_group
 
 t1 = torch.arange(0, 20)
@@ -18,11 +19,22 @@ tlist3 = broadcast(t3, world_size=4)
 print(f"tlist3.len: {len(tlist3)}\n{tlist3}")
 print(f"tlist3[0]: {tlist3[0].shape}")
 """
-# reduce
-print("Reduce:\n", tlist)
-t4 = reduce(tlist)
-print(t4)
-
-def fn(rank=0, world_size=1):
+import os
+def setup(rank, world_size):
+    os.environ["MASTER_ADDR"] = "localhost"
+    os.environ["MASTER_PORT"] = "29500"
+    # init proc group
     dist.init_process_group(backend="gloo", rank=rank, world_size=world_size)
-    group = dist.new_group
+
+def clean():
+    dist.destroy_process_group()
+
+def demo(rank, world_size):
+    setup(rank, world_size)
+    tensor = torch.ones(3, 3).to(rank)
+
+def run_demo(demo_fn, world_size):
+    mp.spawn(demo_fn,
+             args=(world_size), 
+             nprocs=world_size,
+             join=True)
