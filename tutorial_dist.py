@@ -2,6 +2,7 @@ import os
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
+from collective import scatter2
 
 """
     Great tutorial on blog https://blog.roboflow.com/collective-communication-distributed-systems-pytorch/
@@ -65,7 +66,7 @@ if __name__ == "__main__":
     processes = []
     mp.set_start_method("spawn")
     for rank in range(size):
-        p = mp.Process(target=init_process, args=(rank, size, do_broadcast))
+        p = mp.Process(target=init_process, args=(rank, size, scatter2))
         p.start()
         processes.append(p)
 

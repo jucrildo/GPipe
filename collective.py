@@ -5,7 +5,7 @@ from torch.distributed import ReduceOp
 import torch.multiprocessing as mp
 
 from typing import Iterable, List, Optional, Tuple, Union
-from helper import _squeeze_list, _rank_in_group
+from helper import _squeeze_list, _rank_in_group, _check_tensors_dtype, _check_tensors_size
 
 # Collective communication "operations"
 def scatter(
@@ -36,6 +36,68 @@ def scatter(
     tensor_list = _squeeze_list(torch.chunk(tensor, world_size, dim=dim_split)) # torch.chunk() returns list of Tensors
 
     return tensor_list #, tensor_list[rank]
+
+# function to fill values
+def fill_tensor_values(tensor: torch.tensor, desired_shape, ) -> torch.tensor: # dim=0 == row
+    if tensor.shape != desired_shape:
+        if len(desired_shape) <= 3:
+            while i != desired_shape[0]:
+                i = len(desired_shape[0] - tensor.shape[0]) - 1
+                for i in range(desired_shape[0]):
+                    tensor[i, :] = 0
+    return tensor
+
+# implementation of scatter function
+def dist_scatter(tensor: torch.tensor, scatter_list: List[torch.tensor], src: int, group: int, fill_tensor=False):
+    """
+    Scatters a list of tensors to all processes in a process group. Each process stores a single tensor and
+    store its data on "tensor" argument.
+
+    Args:
+        tensor: output tensor
+        scatter_list: list of tensors to scatter
+        src: source rank
+        group: process group
+    """
+    if not scatter_list:
+        raise AttributeError("Empty scatter_list")
+
+    if not _check_tensors_dtype(scatter_list, tensor.dtype):
+        raise ValueError("Tensors must have the same data type")
+
+#    if not _check_tensors_size(scatter_list) and fill_tensor:
+#        for t in range(scatter_list):
+#            t = fill_tensor_values(scatter_list[t]) # check after
+
+    scatter_list = [t for t in scatter_list]
+    rank = dist.get_rank()
+    if src == rank:
+        input_tensors = [scatter_list]
+        output_tensors = [tensor]
+    else:
+        input_tensors = []
+        output_tensors = [tensor]
+
+    
+
+    
+
+
+# scatter
+def scatter2(rank: int, world_size: int) -> None:
+    """
+    Args:
+        rank: 
+    """
+    group = dist.new_group(list(range(world_size)))
+    tensor = torch.empty(1)
+    if rank == 0:
+        tensor_list = [torch.tensor([i+1], dtype=torch.float32) for i in range(world_size)]
+        dist.scatter(tensor, scatter_list=tensor_list, src=0, group=group)
+    else:
+        dist.scatter(tensor, scatter_list=[], src=0, group=group)
+    print(f"rank[{rank}] data = {tensor[0]}")
+
 
 # still need a lot of changes. Now that I understood how ranks and processes groups work, remake this.
 def broadcast(tensor: torch.tensor, world_size: int = 1) -> List[torch.tensor]:
