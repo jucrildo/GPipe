@@ -8,7 +8,7 @@ from typing import Iterable, List, Optional, Tuple, Union
 from helper import _squeeze_list, _rank_in_group, _check_tensors_dtype, _check_tensors_size
 
 # Collective communication "operations"
-def do_scatter(rank: int, world_size: int) -> None:
+def scatter(rank: int, world_size: int) -> None:
     """
     Apply scatter operation
     Args:
@@ -17,8 +17,13 @@ def do_scatter(rank: int, world_size: int) -> None:
     """
     group = dist.new_group(list(range(world_size))) # create group with all processes
     tensor = torch.empty(1)
+    #t = torch.tensor([10., 20., 30., 40.], dtype=torch.float32)
+    t = torch.randn((4), dtype=torch.float32)
     if rank == 0:
-        tensor_list = [torch.tensor([i+1], dtype=torch.float32) for i in range(world_size)]
+        #tensor_list = [torch.tensor([i+1], dtype=torch.float32) for i in range(world_size)]
+        #tensor_list = [torch.tensor([10*(i+1)], dtype=torch.float32) for i in range(world_size)]
+        tensor_list = list(torch.chunk(t, world_size))
+        print(f"tensor_list: {tensor_list}")
         dist.scatter(tensor, scatter_list=tensor_list, src=0, group=group)
     else:
         dist.scatter(tensor, scatter_list=[], src=0, group=group)
