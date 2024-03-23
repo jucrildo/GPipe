@@ -57,10 +57,6 @@ def do_broadcast(rank: int, size: int):
     # all ranks have tensor([0.]) from rank 0
     print(f"rank[{rank}] data = {tensor}")
 
-def hello(rank: int, size: int):
-    # each process will call this functions
-    print(f"rank[{rank}] say hi!")
-
 if __name__ == "__main__":
     size = 6
     processes = []

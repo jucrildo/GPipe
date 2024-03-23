@@ -1,10 +1,9 @@
 import os
-#import torch
+import torch
 import torch.distributed as dist
-#import torch.multiprocessing as mp
 
 # 1st: initialize process group
-def setup_process_group(backend: str, rank: int, world_size: int, function, ) -> None:
+def setup_process_group(backend: str, rank: int, world_size: int, function) -> None:
     """
     Args:
         backend: chosen backend ("nccl", "gloo")
