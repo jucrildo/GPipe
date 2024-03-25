@@ -1,4 +1,5 @@
 # import os
+import numpy
 import torch
 import torch.distributed as dist
 from torch.distributed import ReduceOp
@@ -8,46 +9,48 @@ from typing import Iterable, List, Optional, Tuple, Union
 from helper import _squeeze_list, _rank_in_group, _check_tensors_dtype, _check_tensors_size
 
 # Collective communication "operations"
-def scatter(rank: int, world_size: int) -> None:
+def scatter(tensor: torch.tensor, rank: int, world_size: int) -> None:
     """
-    Apply scatter operation
+    Scatters a tensor on rank 0 to all other ranks.
     Args:
         rank: rank that called the operation
         world_size: number of processes
     """
     group = dist.new_group(list(range(world_size))) # create group with all processes
-    tensor = torch.empty(1)
-    #t = torch.tensor([10., 20., 30., 40.], dtype=torch.float32)
-    t = torch.randn((4), dtype=torch.float32)
+    t = torch.empty(1)
     if rank == 0:
-        #tensor_list = [torch.tensor([i+1], dtype=torch.float32) for i in range(world_size)]
-        #tensor_list = [torch.tensor([10*(i+1)], dtype=torch.float32) for i in range(world_size)]
-        tensor_list = list(torch.chunk(t, world_size))
-        print(f"tensor_list: {tensor_list}")
-        dist.scatter(tensor, scatter_list=tensor_list, src=0, group=group)
+        tensor_list = list(torch.chunk(tensor, world_size))
+        print(f"tensor_list: {tensor_list}, {tensor_list[0].dtype}")
+        dist.scatter(t, scatter_list=tensor_list, src=0, group=group)
     else:
-        dist.scatter(tensor, scatter_list=[], src=0, group=group)
-    print(f"rank[{rank}] data = {tensor[0]}")
+        dist.scatter(t, scatter_list=[], src=0, group=group)
+    print(f"rank[{rank}] data = {t}")
 
-
-def reduce(rank: int, world_size: int, op: ReduceOp = ReduceOp.SUM) -> None:
+def reduce(tensor: torch.tensor, 
+           rank: int, 
+           world_size: int, 
+           op: torch.distributed.ReduceOp = ReduceOp.SUM) -> None:
     """
-    Apply reduce operation
+    Gathers the tensors and reduce them using an Operation such as SUM, placing the result on root rank.
+    Args:
+        rank: rank that called the process
+        world_size: number of processes
+        op: operation to be performed during reduce
     """
+    print(f"rank{rank}(before) tensor: {tensor}")
     group = dist.new_group(list(range(world_size))) # create a group with all the processes
-    tensor = torch.ones(1)
-    # sending all tensors to rank 0 and doing the operation on it
+    # each call sends the current rank tensor to rank 0. This sums up the tensor on each call to the current tensor on rank 0
     dist.reduce(tensor, dst=0, op=op, group=group)
-    # only rank 0 will have 4 tensors
-    print(f"rank[{rank}] data = {tensor[0]}")
+    # only rank 0 accumulated tensors 
+    print(f"rank[{rank}](after) data = {tensor}")
 
-
-def gather(rank: int, world_size: int) -> None:
+def gather(tensor: torch.tensor, rank: int, world_size: int) -> None:
     """
-    Apply gather operation
+    Collect tensors from each device and gathers/concatenate them into root rank
     """
     group = dist.new_group(list(range(world_size))) # create a group with all the processes
-    tensor = torch.tensor([rank], dtype=torch.float32)
+    #tensor_gathers = torch.tensor([rank], dtype=torch.float32)
+    print(f"rank[{rank}](before) tensor: {tensor}")
     # sending all tensors from rank 0 to others
     if rank == 0:
         # create an empty list which we'll use to hold the gathered values
@@ -58,7 +61,7 @@ def gather(rank: int, world_size: int) -> None:
     # only rank 0 will have the tensors from the other processes
     # tensor([0.]), tensor([1.]), tensor([2.]), tensor([3.])
     if rank == 0:
-        print(f"rank[{rank}] data = {tensor_list}")
+        print(f"rank[{rank}](after) data = {tensor_list}")
 
 
 def broadcast(rank: int, world_size: int) -> None:
