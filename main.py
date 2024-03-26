@@ -10,11 +10,11 @@ if __name__ == "__main__":
     processes = []
     mp.set_start_method("spawn")
     for rank in range(size):
-        p = mp.Process(target=setup_group, args=("gloo", rank, size, tensor*rank, gather))
+        p = mp.Process(target=setup_group, args=("gloo", rank, size, tensor*rank, broadcast))
         p.start()
         processes.append(p)
 
     for p in processes:
         p.join()
 
-   # destroy_group()
+    destroy_group()

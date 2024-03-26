@@ -46,31 +46,38 @@ def reduce(tensor: torch.tensor,
 
 def gather(tensor: torch.tensor, rank: int, world_size: int) -> None:
     """
-    Collect tensors from each device and gathers/concatenate them into root rank
+    Collect tensors from each device and gathers/concatenate them into root rank.
+    Args:
+        tensor: tensor of each process
+        rank: each rank of the process group
+        world_size: number of processes
     """
     group = dist.new_group(list(range(world_size))) # create a group with all the processes
     #tensor_gathers = torch.tensor([rank], dtype=torch.float32)
     print(f"rank[{rank}](before) tensor: {tensor}")
     # sending all tensors from rank 0 to others
-    if rank == 0:
+    #if rank == 0:
         # create an empty list which we'll use to hold the gathered values
-        tensor_list = [torch.empty(1) for i in range(world_size)]
-        dist.gather(tensor, gather_list=tensor_list, dst=0, group=group)
-    else:
-        dist.gather(tensor, gather_list=[], dst=0, group=group)
+    tensor_list = [torch.empty(i) for i in range(world_size)]
+    dist.gather(tensor, gather_list=tensor_list, dst=0, group=group)
+    #else:
+        #dist.gather(tensor, gather_list=[], dst=0, group=group)
+
     # only rank 0 will have the tensors from the other processes
     # tensor([0.]), tensor([1.]), tensor([2.]), tensor([3.])
     if rank == 0:
         print(f"rank[{rank}](after) data = {tensor_list}")
 
 
-def broadcast(rank: int, world_size: int) -> None:
+def broadcast(tensor: torch.tensor, rank: int, world_size: int) -> None:
     """
     Apply broadcast operation
     """
     group = dist.new_group(list(range(world_size))) # create a group with all the processes
+    print(f"rank[{rank}](before) tensor: {tensor}")
     if rank == 0:
-        tensor = torch.tensor([rank], dtype=torch.float32)
+        tensor = torch.tensor(10, dtype=torch.float32)
+        #tensor = torch.tensor([rank], dtype=torch.float32)
     else:
         tensor = torch.empty(1)
         # sending all tensors to the others
