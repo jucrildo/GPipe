@@ -2,7 +2,7 @@ import os
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
-from collective import scatter2
+#from collective import scatter2
 
 """
     Great tutorial on blog https://blog.roboflow.com/collective-communication-distributed-systems-pytorch/
@@ -10,13 +10,43 @@ from collective import scatter2
     implement those functions from scratch.
 """
 
-def init_process(rank: int, size: int, fn, backend="gloo"):
+def init_process(rank: int, size: int, backend="gloo"):
     """Initialize distributed environment"""
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = "29500"
     dist.init_process_group(backend=backend, rank=rank, world_size=size)
-    fn(rank, size)
+    #fn(rank, size)
 
+def gather(tensor, root_rank):
+    gathered_tensors = [torch.empty(1) for _ in range(dist.get_world_size())]
+    dist.gather(tensor, gathered_tensors, root_rank)
+    if dist.get_rank() == root_rank:
+        return gathered_tensors[root_rank]
+
+
+
+if __name__ == "__main__":
+    world_size = 4
+    init_process(rank=dist.get_rank(), size=world_size)
+
+    # tensor to be gathered
+    tensor = torch.tensor([1], dtype=torch.float32)
+
+    # lauch multiple processes
+    processes = [mp.Process(target=gather, args=(tensor, 0)) for _ in range(world_size)]
+
+    for p in processes:
+        p.start()
+
+    for p in processes:
+        p.join()
+
+    if dist.get_rank() == 0:
+        print(f"gathered tensor: {gathered_tensor}")
+
+
+
+"""
 def do_reduce(rank: int, size: int):
     group = dist.new_group(list(range(size)))
     tensor = torch.ones(1)
@@ -68,3 +98,4 @@ if __name__ == "__main__":
 
     for p in processes:
         p.join()
+"""

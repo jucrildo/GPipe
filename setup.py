@@ -18,5 +18,5 @@ def setup_group(backend: str, rank: int, world_size: int, tensor: torch.tensor, 
     function(tensor, rank, world_size) # in the tutorial, we're calling the function 
 
 # after finishes distributed training
-def destroy_group() -> None:
+def destroy_group():
     dist.destroy_process_group()

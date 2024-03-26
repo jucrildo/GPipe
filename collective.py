@@ -9,7 +9,7 @@ from typing import Iterable, List, Optional, Tuple, Union
 from helper import _squeeze_list, _rank_in_group, _check_tensors_dtype, _check_tensors_size
 
 # Collective communication "operations"
-def scatter(tensor: torch.tensor, rank: int, world_size: int) -> None:
+def scatter(tensor: torch.tensor, rank: int, world_size: int) -> torch.tensor: #None:
     """
     Scatters a tensor on rank 0 to all other ranks.
     Args:
@@ -26,10 +26,12 @@ def scatter(tensor: torch.tensor, rank: int, world_size: int) -> None:
         dist.scatter(t, scatter_list=[], src=0, group=group)
     print(f"rank[{rank}] data = {t}")
 
+    return tensor_list[rank]
+
 def reduce(tensor: torch.tensor, 
            rank: int, 
            world_size: int, 
-           op: torch.distributed.ReduceOp = ReduceOp.SUM) -> None:
+           op: torch.distributed.ReduceOp = ReduceOp.SUM) -> torch.tensor: #None:
     """
     Gathers the tensors and reduce them using an Operation such as SUM, placing the result on root rank.
     Args:
@@ -40,10 +42,16 @@ def reduce(tensor: torch.tensor,
     print(f"rank{rank}(before) tensor: {tensor}")
     group = dist.new_group(list(range(world_size))) # create a group with all the processes
     # each call sends the current rank tensor to rank 0. This sums up the tensor on each call to the current tensor on rank 0
-    dist.reduce(tensor, dst=0, op=op, group=group)
+    work = dist.reduce(tensor, dst=0, op=op, group=group)
     # only rank 0 accumulated tensors 
-    print(f"rank[{rank}](after) data = {tensor}")
+    if rank == 0:
+        print(f"rank[{rank}](after) data = {tensor}")
+        return tensor, work
+    
+    return tensor
 
+
+# --- not working ---
 def gather(tensor: torch.tensor, rank: int, world_size: int) -> None:
     """
     Collect tensors from each device and gathers/concatenate them into root rank.
@@ -56,17 +64,18 @@ def gather(tensor: torch.tensor, rank: int, world_size: int) -> None:
     #tensor_gathers = torch.tensor([rank], dtype=torch.float32)
     print(f"rank[{rank}](before) tensor: {tensor}")
     # sending all tensors from rank 0 to others
-    #if rank == 0:
+    if rank == 0:
         # create an empty list which we'll use to hold the gathered values
-    tensor_list = [torch.empty(i) for i in range(world_size)]
-    dist.gather(tensor, gather_list=tensor_list, dst=0, group=group)
-    #else:
-        #dist.gather(tensor, gather_list=[], dst=0, group=group)
+        tensor_list = [torch.empty(1) for i in range(world_size)]
+        work = dist.gather(tensor, gather_list=tensor_list, dst=0, group=group)
+    else:
+        dist.gather(tensor, gather_list=[], dst=0, group=group)
 
     # only rank 0 will have the tensors from the other processes
     # tensor([0.]), tensor([1.]), tensor([2.]), tensor([3.])
     if rank == 0:
         print(f"rank[{rank}](after) data = {tensor_list}")
+    print(f"rank[{rank}](after) data = {tensor_list}")
 
 
 def broadcast(tensor: torch.tensor, rank: int, world_size: int) -> None:
@@ -85,7 +94,23 @@ def broadcast(tensor: torch.tensor, rank: int, world_size: int) -> None:
     # all ranks will have tensor([0.]) from rank 0
     print(f"rank[{rank}] data = {tensor}")
 
+def all_reduce(tensor: torch.tensor, rank: int, world_size: int, op: torch.distributed.ReduceOp = ReduceOp.SUM):
+    group = dist.new_group(list(range(world_size)))
+    print(f"rank[{rank}](before) tensor: {tensor}")
+    work = dist.all_reduce(tensor, op=op, group=group)
+    print(f"rank[{rank}](after) tensor: {tensor}")
+    return tensor
 
+# --- not working --- 
+def all_gather(tensor: torch.tensor, rank: int, world_size: int):
+    group = dist.new_group(list(range(world_size)))
+    print(f"rank[{rank}](before) data = {tensor_list}")
+    # create empty list to hold gathered values
+    tensor_list = [torch.empty(1) for i in range(world_size)]
+    # sending all tensors to the others
+    work = dist.all_gather(tensor_list, tensor, group=group)
+    
+    print(f"rank[{rank}](after) data = {tensor_list}")
 
 
 
@@ -93,6 +118,7 @@ def broadcast(tensor: torch.tensor, rank: int, world_size: int) -> None:
 # OBS:
     # Questions:
     # 1.) Do I need to pass the rank and local_rank to perform scatter?
+    # 2.) Why gather and all_gather are not working?
     #
     #if not _check_tensors_dtype(tensor_list, tensor_dtype=tensor_list[0].dtype):
     #    raise TypeError("Tensors dtypes are different")
